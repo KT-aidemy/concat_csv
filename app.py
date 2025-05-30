@@ -1,19 +1,15 @@
 import streamlit as st
 import pandas as pd
-from io import StringIO
 
-st.title("複数CSVファイルを結合するアプリ")
+st.title("共通列を使って複数CSVファイルを結合するアプリ")
 
-# アップロード
+# CSVファイルのアップロード
 uploaded_files = st.file_uploader(
-    "CSVファイルを複数選択してください", 
-    type="csv", 
+    "CSVファイルを複数選択してください（共通列だけで結合されます）",
+    type="csv",
     accept_multiple_files=True
 )
 
-concat_axis = st.radio("結合方法を選んでください", ("縦に結合（行方向）", "横に結合（列方向）"))
-
-# ファイルがアップロードされた場合
 if uploaded_files:
     dfs = []
     for uploaded_file in uploaded_files:
@@ -24,23 +20,27 @@ if uploaded_files:
         except Exception as e:
             st.error(f"{uploaded_file.name} の読み込みに失敗しました: {e}")
 
-    # 結合処理
-    if len(dfs) > 0:
-        axis = 0 if concat_axis.startswith("縦") else 1
-        try:
-            merged_df = pd.concat(dfs, axis=axis, ignore_index=(axis == 0))
+    if len(dfs) >= 2:
+        # 共通列を取得
+        common_cols = set(dfs[0].columns)
+        for df in dfs[1:]:
+            common_cols &= set(df.columns)
+
+        if common_cols:
+            st.info(f"共通列: {sorted(common_cols)}")
+            dfs_common = [df[list(common_cols)] for df in dfs]
+            merged_df = pd.concat(dfs_common, ignore_index=True)
             st.write("✅ 結合結果プレビュー:")
             st.dataframe(merged_df)
 
-            # ダウンロードリンク生成
             csv = merged_df.to_csv(index=False)
             st.download_button(
                 label="📥 CSVとしてダウンロード",
                 data=csv,
-                file_name="merged_data.csv",
+                file_name="merged_common_columns.csv",
                 mime="text/csv"
             )
-        except Exception as e:
-            st.error(f"結合処理中にエラーが発生しました: {e}")
+        else:
+            st.error("アップロードされたファイルに共通の列がありません。")
 else:
-    st.info("CSVファイルを複数アップロードしてください。")
+    st.info("CSVファイルをアップロードしてください。共通列が自動的に判定されます。")
